@@ -37,11 +37,16 @@
 #include <sol-log.h>
 #include <sol-mainloop.h>
 #include <sol-network.h>
-#include <sol-str-slice.h>
-
-#include <periph_cpu.h>
 
 #define DEFAULT_UDP_PORT 5683
+
+#ifdef SOL_PLATFORM_RIOT
+#define GPIO_BTN 0x4100441c
+#define GPIO_LED 0x41004413
+#elif SOL_PLATFORM_ZEPHYR
+#define GPIO_BTN 15
+#define GPIO_LED 25
+#endif
 
 #define OC_CORE_JSON_SEPARATOR ","
 #define OC_CORE_ELEM_JSON_START "{\"oc\":[{\"href\":\"%s\",\"rep\":{"
@@ -64,10 +69,11 @@ light_resource_to_rep(const struct sol_coap_resource *resource,
     bool state, char *buf, int buflen)
 {
     uint8_t path[64];
+    size_t pathlen;
     int len = 0;
 
     memset(&path, 0, sizeof(path));
-    sol_coap_uri_path_to_buf(resource->path, path, sizeof(path));
+    sol_coap_uri_path_to_buf(resource->path, path, sizeof(path), &pathlen);
 
     len += snprintf(buf + len, buflen - len, OC_CORE_ELEM_JSON_START, path);
     len += snprintf(buf + len, buflen - len, OC_CORE_PROP_JSON_NUMBER, "power", 100);
@@ -91,6 +97,10 @@ set_light_state(struct light_context *ctx)
     sol_gpio_write(ctx->led, ctx->state);
 
     pkt = sol_coap_packet_notification_new(ctx->server, ctx->resource);
+    if (!pkt) {
+        SOL_WRN("Oops! No memory?");
+        return;
+    }
 
     sol_coap_header_set_code(pkt, SOL_COAP_RSPCODE_CONTENT);
 
@@ -102,7 +112,7 @@ set_light_state(struct light_context *ctx)
 }
 
 static int
-light_method_put(const struct sol_coap_resource *resource, struct sol_coap_packet *req,
+light_method_put(struct sol_coap_server *server, const struct sol_coap_resource *resource, struct sol_coap_packet *req,
     const struct sol_network_link_addr *cliaddr, void *data)
 {
     struct light_context *lc = data;
@@ -138,7 +148,7 @@ done:
 }
 
 static int
-light_method_get(const struct sol_coap_resource *resource, struct sol_coap_packet *req,
+light_method_get(struct sol_coap_server *s, const struct sol_coap_resource *resource, struct sol_coap_packet *req,
     const struct sol_network_link_addr *cliaddr, void *data)
 {
     struct light_context *lc = data;
@@ -165,12 +175,12 @@ static struct sol_gpio *
 setup_led(void)
 {
     struct sol_gpio_config conf = {
-        .api_version = SOL_GPIO_CONFIG_API_VERSION,
+        SOL_SET_API_VERSION(.api_version = SOL_GPIO_CONFIG_API_VERSION,)
         .dir = SOL_GPIO_DIR_OUT,
         .active_low = true
     };
 
-    return sol_gpio_open(GPIO(PA, 19), &conf);
+    return sol_gpio_open(GPIO_LED, &conf);
 }
 
 static bool
@@ -188,7 +198,7 @@ timeout_cb(void *data)
 }
 
 static void
-button_pressed(void *data, struct sol_gpio *gpio)
+button_pressed(void *data, struct sol_gpio *gpio, bool value)
 {
     struct light_context *ctx = data;
     if (ctx->timeout) return;
@@ -199,7 +209,7 @@ static struct sol_gpio *
 setup_button(const struct light_context *ctx)
 {
     struct sol_gpio_config conf = {
-        .api_version = SOL_GPIO_CONFIG_API_VERSION,
+        SOL_SET_API_VERSION(.api_version = SOL_GPIO_CONFIG_API_VERSION,)
         .dir = SOL_GPIO_DIR_IN,
         .in = {
             .trigger_mode = SOL_GPIO_EDGE_FALLING,
@@ -208,19 +218,17 @@ setup_button(const struct light_context *ctx)
         }
     };
 
-    return sol_gpio_open(GPIO(PA, 28), &conf);
+    return sol_gpio_open(GPIO_BTN, &conf);
 }
 static bool
 setup_server(void)
 {
     struct light_context *lc;
     static struct sol_coap_resource light = {
-        .api_version = SOL_COAP_RESOURCE_API_VERSION,
+        SOL_SET_API_VERSION(.api_version = SOL_COAP_RESOURCE_API_VERSION,)
         .get = light_method_get,
         .put = light_method_put,
-        .iface = SOL_STR_SLICE_LITERAL("oc.mi.def"),
-        .resource_type = SOL_STR_SLICE_LITERAL("core.light"),
-        .flags = SOL_COAP_FLAGS_WELL_KNOWN | SOL_COAP_FLAGS_OC_CORE,
+        .flags = SOL_COAP_FLAGS_WELL_KNOWN,
         .path = {
             SOL_STR_SLICE_LITERAL("a"),
             SOL_STR_SLICE_LITERAL("light"),
@@ -293,17 +301,11 @@ show_interfaces(void)
     }
 }
 
-int main(void)
+static void
+startup(void)
 {
-    sol_init();
-
     show_interfaces();
 
     setup_server();
-
-    sol_run();
-
-    sol_shutdown();
-
-    return 0;
 }
+SOL_MAIN_DEFAULT(startup, NULL);

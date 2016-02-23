@@ -1,0 +1,15 @@
+ifdef MAIN_STACK_SIZE
+export MAIN_STACK_SIZE
+endif
+
+check_vars := $(and $(RIOTBASE))
+vars_missing := $(if $(check_vars),"","yes")
+
+SOURCES_DIR = $(BUILD_DIR)
+export SOLETTA_NODE_DESCRIPTIONS ?= $(RIOTBASE)/pkg/libsoletta/soletta/build/soletta_sysroot/usr/share/soletta/flow/descriptions
+
+missing_env_vars:
+	@echo -e \
+	Missing environment variables.\\n \
+	The RIOT build requires the following variables to be set:\\n\\n \
+	RIOTBASE: The path to the source of RIOT-OS.\\n

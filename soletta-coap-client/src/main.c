@@ -38,10 +38,15 @@
 #include <sol-mainloop.h>
 #include <sol-network.h>
 
-#include <ps.h>
-#include <periph_cpu.h>
-
 #define DEFAULT_UDP_PORT 5683
+
+#if SOL_PLATFORM_RIOT
+#define GPIO_BTN 0x4100441c
+#define GPIO_LED 0x41004413
+#elif SOL_PLATFORM_ZEPHYR
+#define GPIO_BTN 15
+#define GPIO_LED 25
+#endif
 
 struct remote_light_context {
     struct sol_coap_server *server;
@@ -61,6 +66,10 @@ remote_light_toggle(struct remote_light_context *ctx)
     uint16_t len;
 
     req = sol_coap_packet_request_new(SOL_COAP_METHOD_PUT, SOL_COAP_TYPE_NONCON);
+    if (!req) {
+        SOL_WRN("Oops! No memory?");
+        return;
+    }
     sol_coap_add_option(req, SOL_COAP_OPTION_URI_PATH, "a", sizeof("a") - 1);
     sol_coap_add_option(req, SOL_COAP_OPTION_URI_PATH, "light", sizeof("light") - 1);
 
@@ -86,7 +95,7 @@ timeout_cb(void *data)
 }
 
 static void
-button_pressed(void *data, struct sol_gpio *gpio)
+button_pressed(void *data, struct sol_gpio *gpio, bool value)
 {
     struct remote_light_context *ctx = data;
     if (!ctx->found || ctx->timeout) return;
@@ -97,7 +106,7 @@ static struct sol_gpio *
 setup_button(const struct remote_light_context *ctx)
 {
     struct sol_gpio_config conf = {
-        .api_version = SOL_GPIO_CONFIG_API_VERSION,
+        SOL_SET_API_VERSION(.api_version = SOL_GPIO_CONFIG_API_VERSION,)
         .dir = SOL_GPIO_DIR_IN,
         .in = {
             .trigger_mode = SOL_GPIO_EDGE_FALLING,
@@ -106,19 +115,19 @@ setup_button(const struct remote_light_context *ctx)
         }
     };
 
-    return sol_gpio_open(GPIO(PA, 28), &conf);
+    return sol_gpio_open(GPIO_BTN, &conf);
 }
 
 static struct sol_gpio *
 setup_led(void)
 {
     struct sol_gpio_config conf = {
-        .api_version = SOL_GPIO_CONFIG_API_VERSION,
+        SOL_SET_API_VERSION(.api_version = SOL_GPIO_CONFIG_API_VERSION,)
         .dir = SOL_GPIO_DIR_OUT,
         .active_low = true
     };
 
-    return sol_gpio_open(GPIO(PA, 19), &conf);
+    return sol_gpio_open(GPIO_LED, &conf);
 }
 
 static bool
@@ -143,17 +152,15 @@ get_state(struct sol_coap_packet *pkt)
     return !memcmp(sub + strlen("state\":"), "true", sizeof("true") - 1);
 }
 
-static int
-notification_reply_cb(struct sol_coap_packet *req, const struct sol_network_link_addr *cliaddr, void *data)
+static bool
+notification_reply_cb(struct sol_coap_server *s, struct sol_coap_packet *req, const struct sol_network_link_addr *cliaddr, void *data)
 {
     struct remote_light_context *ctx = data;
-
-    ps();
 
     ctx->state = get_state(req);
     sol_gpio_write(ctx->led, ctx->state);
 
-    return 0;
+    return true;
 }
 
 static void
@@ -164,6 +171,10 @@ observe(struct remote_light_context *ctx)
     uint8_t token[] = { 0x36, 0x36, 0x36, 0x21 };
 
     req = sol_coap_packet_request_new(SOL_COAP_METHOD_GET, SOL_COAP_TYPE_CON);
+    if (!req) {
+        SOL_WRN("Looks like we have no space");
+        return;
+    }
 
     sol_coap_header_set_token(req, token, sizeof(token));
 
@@ -173,12 +184,10 @@ observe(struct remote_light_context *ctx)
     sol_coap_add_option(req, SOL_COAP_OPTION_URI_PATH, "light", sizeof("light") - 1);
 
     sol_coap_send_packet_with_reply(ctx->server, req, &ctx->addr, notification_reply_cb, ctx);
-
-    return true;
 }
 
-static int
-discover_reply_cb(struct sol_coap_packet *req, const struct sol_network_link_addr *cliaddr, void *data)
+static bool
+discover_reply_cb(struct sol_coap_server *s, struct sol_coap_packet *req, const struct sol_network_link_addr *cliaddr, void *data)
 {
     struct remote_light_context *ctx = data;
     char buf[SOL_INET_ADDR_STRLEN];
@@ -200,7 +209,7 @@ discover_reply_cb(struct sol_coap_packet *req, const struct sol_network_link_add
 
     observe(ctx);
 
-    return 0;
+    return false;
 }
 
 static bool
@@ -210,12 +219,17 @@ discover_resource(struct remote_light_context *ctx)
     struct sol_network_link_addr cliaddr = { };
 
     req = sol_coap_packet_request_new(SOL_COAP_METHOD_GET, SOL_COAP_TYPE_CON);
+    if (!req) {
+        SOL_WRN("Looks like we have no space");
+        return false;
+    }
 
     sol_coap_add_option(req, SOL_COAP_OPTION_URI_PATH, "a", sizeof("a") - 1);
     sol_coap_add_option(req, SOL_COAP_OPTION_URI_PATH, "light", sizeof("light") - 1);
 
-    cliaddr.family = AF_INET6;
-    sol_network_addr_from_str(&cliaddr, "ff05::fd");
+    cliaddr.family = SOL_NETWORK_FAMILY_INET6;
+    sol_network_addr_from_str(&cliaddr, "ff02::fd");
+    //sol_network_addr_from_str(&cliaddr, "ff80::863a:4bff:fe8c:f665");
     cliaddr.port = DEFAULT_UDP_PORT;
 
     sol_coap_send_packet_with_reply(ctx->server, req, &cliaddr, discover_reply_cb, ctx);
@@ -278,17 +292,11 @@ show_interfaces(void)
     }
 }
 
-int main(void)
+static void
+startup(void)
 {
-    sol_init();
-
     show_interfaces();
 
     setup_server();
-
-    sol_run();
-
-    sol_shutdown();
-
-    return 0;
 }
+SOL_MAIN_DEFAULT(startup, NULL);

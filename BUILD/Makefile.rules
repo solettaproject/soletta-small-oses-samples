@@ -1,0 +1,10 @@
+FBP_GENERATOR ?= $(shell which sol-fbp-generator)
+
+GENERATED_C_SOURCES = $(FBP_SOURCES:%.fbp=%.c)
+
+ifneq (,$(FLOW_CONFIG))
+FLOW_CONF_PARAM := -c $(FLOW_CONFIG)
+endif
+%.c: %.fbp
+	@mkdir -p $(dir $@)
+	$(FBP_GENERATOR) -j $(SOLETTA_NODE_DESCRIPTIONS) $(FLOW_CONF_PARAM) $< $@

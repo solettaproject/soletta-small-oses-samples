@@ -1,0 +1,3 @@
+INCLUDES += -I$(RIOTBASE)/pkg/libsoletta/soletta/build/soletta_sysroot/usr/include/soletta \
+			-I$(RIOTBASE)/sys/include \
+			-I$(RIOTBASE)/sys/posix/include

@@ -1,0 +1,23 @@
+OBJECTS := $(C_SOURCES:%.c=%.o)
+OBJECTS += $(FBP_SOURCES:%.fbp=%.o)
+MAIN_STACK_SIZE ?= 1024
+
+SOURCES_DIR = $(BUILD_DIR)/src
+
+check_vars := $(and $(SOLETTA_BASE_DIR),$(ZEPHYR_BASE),$(ZEPHYR_GCC_VARIANT),$(ZEPHYR_SDK_INSTALL_DIR))
+vars_missing := $(if $(check_vars),"","yes")
+
+zephyr_prepare: prepare
+	@echo "obj-y := $(OBJECTS)" > $(SOURCES_DIR)/Makefile
+	@echo "TASK MAINTASK 7 main_task $(MAIN_STACK_SIZE) [EXE]" > $(BUILD_DIR)/prj.mdef
+
+$(TARGET): zephyr_prepare
+
+missing_env_vars:
+	@echo -e \
+	Missing environment variables.\\n \
+	The Zephyr build requires the following variables to be set:\\n\\n \
+	ZEPHYR_BASE: Should point to the top Zephyr source directory.\\n \
+	ZEPHYR_GCC_VARIANT: The toolchain to use to build Zephyr.\\n \
+	ZEPHYR_SDK_INSTALL_DIR: The path where the Zephyr SDK is installed.\\n \
+	SOLETTA_BASE_DIR: The path to source of Soletta.\\n

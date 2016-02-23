@@ -1,0 +1,3 @@
+APPDEPS += $(GENERATED_C_SOURCES)
+
+include $(MAKEFILE_TOPDIR)/Makefile.rules

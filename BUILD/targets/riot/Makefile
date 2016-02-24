@@ -24,6 +24,8 @@ ifdef MAIN_STACK_SIZE
 CFLAGS += -DTHREAD_STACKSIZE_MAIN=$(MAIN_STACK_SIZE)
 endif
 
+CFLAGS += -DDEVELHELP
+
 QUIET ?= 1
 
 include $(RIOTBASE)/Makefile.include

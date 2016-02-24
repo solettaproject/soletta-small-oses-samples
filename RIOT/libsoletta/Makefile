@@ -17,7 +17,7 @@ unexport BINDIR
 .PHONY: all clean
 
 all: $(PKG_DIR)/.config $(MERGE_APP_CONF)
-	"$(MAKE)" -C $(PKG_DIR)
+	$(MAKE) -C $(PKG_DIR)
 	cp $(PKG_DIR)/build/soletta_sysroot/usr/lib/libsoletta.a $(BINDIR)/libsoletta.a
 
 merge_app_conf: $(SOLETTA_CONF) $(PKG_DIR)/.config
@@ -25,7 +25,7 @@ merge_app_conf: $(SOLETTA_CONF) $(PKG_DIR)/.config
 	tools/kconfig/merge_config.sh .config $(SOLETTA_CONF)
 
 $(PKG_DIR)/.config: $(PKG_DIR)/Makefile
-	"$(MAKE)" -C $(PKG_DIR) alldefconfig
+	$(MAKE) -C $(PKG_DIR) alldefconfig
 
 $(PKG_DIR)/Makefile: $(PKG_DIR)/.git/config
 

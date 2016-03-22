@@ -1,0 +1,3 @@
+MAIN_STACK_SIZE := 8192
+FBP_SOURCES := main.fbp
+LOG_LEVEL := 5

@@ -9,7 +9,7 @@ vars_missing := $(if $(check_vars),"","yes")
 
 zephyr_prepare: prepare
 	@echo "obj-y := $(OBJECTS)" > $(SOURCES_DIR)/Makefile
-	@echo "TASK MAINTASK 7 main_task $(MAIN_STACK_SIZE) [EXE]" > $(BUILD_DIR)/prj.mdef
+	@echo "TASK MAINTASK 7 main $(MAIN_STACK_SIZE) [EXE]" > $(BUILD_DIR)/prj.mdef
 
 $(TARGET): zephyr_prepare
 

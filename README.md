@@ -41,12 +41,3 @@ Building for Zephyr requires:
  * `SOLETTA_BASE_DIR` pointing to the Soletta sources
  * `ZEPHYR_GCC_VARIANT` set to the toolchain variant to use (usually, "zephyr")
  * `ZEPHYR_SDK_INSTALL_DIR` set to the path where Zephyr's SDK is installed
-
-## TODO
- * Make this README more instructive.
- * Less Makefiles, more scripts.
- * Handle dependencies better, so we don't rebuild things we don't need.
- * Add support for applications with custom node types.
- * Make plain C applications "configurable", as FBP ones are.
- * Try to detect which RIOT modules are needed based on Soletta's
-   configuration, or at least make it per-application too.

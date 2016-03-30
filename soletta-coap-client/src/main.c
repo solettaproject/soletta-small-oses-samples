@@ -18,6 +18,7 @@
 
 #include <stdio.h>
 
+#include <soletta.h>
 #include <sol-coap.h>
 #include <sol-gpio.h>
 #include <sol-log.h>

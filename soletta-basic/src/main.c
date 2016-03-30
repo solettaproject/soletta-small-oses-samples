@@ -16,8 +16,8 @@
  * limitations under the License.
  */
 
+#include <soletta.h>
 #include <sol-log.h>
-#include <sol-mainloop.h>
 
 static bool
 timeout_cb(void *data)

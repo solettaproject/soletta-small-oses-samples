@@ -18,6 +18,10 @@ TARGET_DIR := $(TARGETS_DIR)/$(TARGET)
 include $(WORKING_TOPDIR)/Makefile.application
 include $(TARGETS_DIR)/Makefile.$(TARGET)
 
+ifneq (,$(LOG_LEVEL))
+export LOGGING_LEVEL = -DSOL_LOG_LEVEL=\"$(LOG_LEVEL)\"
+endif
+
 APP_SOURCES := $(addprefix $(WORKING_TOPDIR)/src/, $(C_SOURCES) $(FBP_SOURCES))
 
 TARGET_CONFIG := $(realpath $(WORKING_TOPDIR)/config.$(TARGET))

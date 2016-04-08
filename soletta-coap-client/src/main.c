@@ -49,8 +49,9 @@ static void
 remote_light_toggle(struct remote_light_context *ctx)
 {
     struct sol_coap_packet *req;
-    uint8_t *payload;
-    uint16_t len;
+    struct sol_buffer *buf;
+    size_t offset;
+    int r;
 
     req = sol_coap_packet_request_new(SOL_COAP_METHOD_PUT, SOL_COAP_TYPE_NONCON);
     if (!req) {
@@ -60,11 +61,17 @@ remote_light_toggle(struct remote_light_context *ctx)
     sol_coap_add_option(req, SOL_COAP_OPTION_URI_PATH, "a", sizeof("a") - 1);
     sol_coap_add_option(req, SOL_COAP_OPTION_URI_PATH, "light", sizeof("light") - 1);
 
-    sol_coap_packet_get_payload(req, &payload, &len);
-    len = snprintf((char *)payload, len, "{\"oc\":[{\"rep\":{\"state\":\%s}}]}",
+    r = sol_coap_packet_get_payload(req, &buf, &offset);
+    SOL_INT_CHECK_GOTO(r, < 0, err);
+    r = sol_buffer_append_printf(buf, "{\"oc\":[{\"rep\":{\"state\":\%s}}]}",
         ctx->state ? "true" : "false");
-    sol_coap_packet_set_payload_used(req, len);
+    SOL_INT_CHECK_GOTO(r, < 0, err);
     sol_coap_send_packet(ctx->server, req, &ctx->addr);
+
+    return;
+
+err:
+    sol_coap_packet_unref(req);
 }
 
 static bool
@@ -85,6 +92,7 @@ static void
 button_pressed(void *data, struct sol_gpio *gpio, bool value)
 {
     struct remote_light_context *ctx = data;
+
     if (!ctx->found || ctx->timeout) return;
     ctx->timeout = sol_timeout_add(300, timeout_cb, ctx);
 }
@@ -93,7 +101,7 @@ static struct sol_gpio *
 setup_button(const struct remote_light_context *ctx)
 {
     struct sol_gpio_config conf = {
-        SOL_SET_API_VERSION(.api_version = SOL_GPIO_CONFIG_API_VERSION,)
+        SOL_SET_API_VERSION(.api_version = SOL_GPIO_CONFIG_API_VERSION, )
         .dir = SOL_GPIO_DIR_IN,
         .in = {
             .trigger_mode = SOL_GPIO_EDGE_FALLING,
@@ -109,7 +117,7 @@ static struct sol_gpio *
 setup_led(void)
 {
     struct sol_gpio_config conf = {
-        SOL_SET_API_VERSION(.api_version = SOL_GPIO_CONFIG_API_VERSION,)
+        SOL_SET_API_VERSION(.api_version = SOL_GPIO_CONFIG_API_VERSION, )
         .dir = SOL_GPIO_DIR_OUT,
         .active_low = true
     };
@@ -120,20 +128,21 @@ setup_led(void)
 static bool
 get_state(struct sol_coap_packet *pkt)
 {
+    struct sol_buffer *buf;
     char *sub = NULL;
-    uint8_t *payload;
-    uint16_t len;
+    size_t offset;
+    int r;
 
     if (!sol_coap_packet_has_payload(pkt)) {
         printf("No payload\n");
         return false;
     }
 
-    sol_coap_packet_get_payload(pkt, &payload, &len);
-    if (!payload)
-        return false;
-    printf("Payload: %.*s\n", len, payload);
-    sub = strstr((char *)payload, "state\":");
+    r = sol_coap_packet_get_payload(pkt, &buf, &offset);
+    SOL_INT_CHECK(r, < 0, false);
+    printf("Payload: %.*s\n", (int)(buf->used - offset),
+        (char *)sol_buffer_at(buf, offset));
+    sub = strstr((char *)sol_buffer_at(buf, offset), "state\":");
     if (!sub)
         return false;
     return !memcmp(sub + strlen("state\":"), "true", sizeof("true") - 1);
@@ -177,14 +186,17 @@ static bool
 discover_reply_cb(struct sol_coap_server *s, struct sol_coap_packet *req, const struct sol_network_link_addr *cliaddr, void *data)
 {
     struct remote_light_context *ctx = data;
-    char buf[SOL_INET_ADDR_STRLEN];
 
-    sol_network_addr_to_str(cliaddr, buf, sizeof(buf));
-    printf("Found resource in: %s\n", buf);
+    SOL_BUFFER_DECLARE_STATIC(buf, SOL_INET_ADDR_STRLEN);
+
+    sol_network_link_addr_to_str(cliaddr, &buf);
+    printf("Found resource in: %s\n", (char *)buf.data);
 
     if (ctx->found) {
-        sol_network_addr_to_str(&ctx->addr, buf, sizeof(buf));
-        printf("Ignoring, as we already had resource from: %s\n", buf);
+        buf.used = 0;
+        sol_network_link_addr_to_str(&ctx->addr, &buf);
+        printf("Ignoring, as we already had resource from: %s\n",
+            (char *)buf.data);
         return 0;
     }
 
@@ -215,8 +227,7 @@ discover_resource(struct remote_light_context *ctx)
     sol_coap_add_option(req, SOL_COAP_OPTION_URI_PATH, "light", sizeof("light") - 1);
 
     cliaddr.family = SOL_NETWORK_FAMILY_INET6;
-    sol_network_addr_from_str(&cliaddr, "ff02::fd");
-    //sol_network_addr_from_str(&cliaddr, "ff80::863a:4bff:fe8c:f665");
+    sol_network_link_addr_from_str(&cliaddr, "ff02::fd");
     cliaddr.port = DEFAULT_UDP_PORT;
 
     sol_coap_send_packet_with_reply(ctx->server, req, &cliaddr, discover_reply_cb, ctx);
@@ -263,17 +274,18 @@ show_interfaces(void)
         const struct sol_network_link *l;
         uint16_t i;
 
-        SOL_VECTOR_FOREACH_IDX(links, l, i) {
+        SOL_VECTOR_FOREACH_IDX (links, l, i) {
             uint16_t j;
             const struct sol_network_link_addr *addr;
 
             printf("Link #%d\n", i);
-            SOL_VECTOR_FOREACH_IDX(&l->addrs, addr, j) {
-                char buf[100];
+            SOL_VECTOR_FOREACH_IDX (&l->addrs, addr, j) {
+                SOL_BUFFER_DECLARE_STATIC(buf, SOL_INET_ADDR_STRLEN);
                 const char *ret;
-                ret = sol_network_addr_to_str(addr, buf, sizeof(buf));
+                ret = sol_network_link_addr_to_str(addr, &buf);
                 if (ret)
-                    printf("\tAddr #%d: %s\n", j, ret);
+                    printf("\tAddr #%d: %.*s\n", j,
+                        SOL_STR_SLICE_PRINT(sol_buffer_get_slice(&buf)));
             }
         }
     }

@@ -1,0 +1,5 @@
+#Server
+led(LED)
+light(oic/server-light)
+
+light STATE -> IN led

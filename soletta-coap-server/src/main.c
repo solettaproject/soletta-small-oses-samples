@@ -53,33 +53,49 @@ struct light_context {
 
 static int
 light_resource_to_rep(const struct sol_coap_resource *resource,
-    bool state, char *buf, int buflen)
+    bool state, struct sol_buffer *buf)
 {
-    uint8_t path[64];
-    size_t pathlen;
-    int len = 0;
+    SOL_BUFFER_DECLARE_STATIC(buffer, 64);
+    int r;
 
-    memset(&path, 0, sizeof(path));
-    sol_coap_uri_path_to_buf(resource->path, path, sizeof(path), &pathlen);
+    r = sol_coap_uri_path_to_buf(resource->path, &buffer, 0, NULL);
+    SOL_INT_CHECK(r, < 0, r);
 
-    len += snprintf(buf + len, buflen - len, OC_CORE_ELEM_JSON_START, path);
-    len += snprintf(buf + len, buflen - len, OC_CORE_PROP_JSON_NUMBER, "power", 100);
-    len += snprintf(buf + len, buflen - len, OC_CORE_JSON_SEPARATOR);
-    len += snprintf(buf + len, buflen - len, OC_CORE_PROP_JSON_STRING, "name", "Soletta LAMP!");
-    len += snprintf(buf + len, buflen - len, OC_CORE_JSON_SEPARATOR);
-    len += snprintf(buf + len, buflen - len, OC_CORE_PROP_JSON_BOOLEAN, "state",
-        state ? "true" : "false");
-    len += snprintf(buf + len, buflen - len, OC_CORE_ELEM_JSON_END);
+    r = sol_buffer_append_printf(buf,
+        OC_CORE_ELEM_JSON_START, (char *)sol_buffer_steal(&buffer, NULL));
+    SOL_INT_CHECK(r, < 0, r);
 
-    return len;
+    r = sol_buffer_append_printf(buf,
+        OC_CORE_PROP_JSON_NUMBER, "power", 100);
+    SOL_INT_CHECK(r, < 0, r);
+
+    r = sol_buffer_append_printf(buf, OC_CORE_JSON_SEPARATOR);
+    SOL_INT_CHECK(r, < 0, r);
+
+    r = sol_buffer_append_printf(buf,
+        OC_CORE_PROP_JSON_STRING, "name", "Soletta LAMP!");
+    SOL_INT_CHECK(r, < 0, r);
+
+    r = sol_buffer_append_printf(buf, OC_CORE_JSON_SEPARATOR);
+    SOL_INT_CHECK(r, < 0, r);
+
+    r = sol_buffer_append_printf(buf,
+        OC_CORE_PROP_JSON_BOOLEAN, "state", state ? "true" : "false" );
+    SOL_INT_CHECK(r, < 0, r);
+
+    r = sol_buffer_append_printf(buf, OC_CORE_ELEM_JSON_END);
+    SOL_INT_CHECK(r, < 0, r);
+
+    return 0;
 }
 
 static void
 set_light_state(struct light_context *ctx)
 {
     struct sol_coap_packet *pkt;
-    uint8_t *payload;
-    uint16_t len;
+    struct sol_buffer *buf;
+    size_t offset;
+    int r;
 
     sol_gpio_write(ctx->led, ctx->state);
 
@@ -91,28 +107,36 @@ set_light_state(struct light_context *ctx)
 
     sol_coap_header_set_code(pkt, SOL_COAP_RSPCODE_CONTENT);
 
-    sol_coap_packet_get_payload(pkt, &payload, &len);
-    len = light_resource_to_rep(ctx->resource, ctx->state, (char *)payload, len);
-    sol_coap_packet_set_payload_used(pkt, len);
+    r = sol_coap_packet_get_payload(pkt, &buf, &offset);
+    SOL_INT_CHECK_GOTO(r, < 0, err);
+    r = light_resource_to_rep(ctx->resource, ctx->state, buf);
+    SOL_INT_CHECK_GOTO(r, < 0, err);
 
     sol_coap_packet_send_notification(ctx->server, ctx->resource, pkt);
+
+    return;
+
+err:
+    sol_coap_packet_unref(pkt);
 }
 
 static int
 light_method_put(struct sol_coap_server *server, const struct sol_coap_resource *resource, struct sol_coap_packet *req,
     const struct sol_network_link_addr *cliaddr, void *data)
 {
+    sol_coap_responsecode_t code = SOL_COAP_RSPCODE_CONTENT;
     struct light_context *lc = data;
     struct sol_coap_packet *resp;
+    struct sol_buffer *buf;
     char *sub = NULL;
-    uint8_t *p;
-    uint16_t len;
-    sol_coap_responsecode_t code = SOL_COAP_RSPCODE_CONTENT;
+    size_t offset;
+    int r;
 
-    sol_coap_packet_get_payload(req, &p, &len);
+    r = sol_coap_packet_get_payload(req, &buf, &offset);
+    SOL_INT_CHECK(r, < 0, r);
 
-    if (p)
-        sub = strstr((char *)p, "state\":");
+    if (buf->used > offset)
+        sub = strstr((char *)sol_buffer_at(buf, offset), "state\":");
     if (!sub) {
         code = SOL_COAP_RSPCODE_BAD_REQUEST;
         goto done;
@@ -140,8 +164,8 @@ light_method_get(struct sol_coap_server *s, const struct sol_coap_resource *reso
 {
     struct light_context *lc = data;
     struct sol_coap_packet *resp;
-    uint8_t *payload;
-    uint16_t len;
+    struct sol_buffer *buf;
+    int r;
 
     resp = sol_coap_packet_new(req);
     if (!resp) {
@@ -151,18 +175,23 @@ light_method_get(struct sol_coap_server *s, const struct sol_coap_resource *reso
     sol_coap_header_set_type(resp, SOL_COAP_TYPE_ACK);
     sol_coap_header_set_code(resp, SOL_COAP_RSPCODE_CONTENT);
 
-    sol_coap_packet_get_payload(resp, &payload, &len);
-    len = light_resource_to_rep(resource, lc->state, (char *)payload, len);
-    sol_coap_packet_set_payload_used(resp, len);
+    r = sol_coap_packet_get_payload(resp, &buf, NULL);
+    SOL_INT_CHECK_GOTO(r, < 0, err);
+    r = light_resource_to_rep(resource, lc->state, buf);
+    SOL_INT_CHECK_GOTO(r, < 0, err);
 
     return sol_coap_send_packet(lc->server, resp, cliaddr);
+
+err:
+    sol_coap_packet_unref(resp);
+    return r;
 }
 
 static struct sol_gpio *
 setup_led(void)
 {
     struct sol_gpio_config conf = {
-        SOL_SET_API_VERSION(.api_version = SOL_GPIO_CONFIG_API_VERSION,)
+        SOL_SET_API_VERSION(.api_version = SOL_GPIO_CONFIG_API_VERSION, )
         .dir = SOL_GPIO_DIR_OUT,
         .active_low = true
     };
@@ -188,6 +217,7 @@ static void
 button_pressed(void *data, struct sol_gpio *gpio, bool value)
 {
     struct light_context *ctx = data;
+
     if (ctx->timeout) return;
     ctx->timeout = sol_timeout_add(300, timeout_cb, ctx);
 }
@@ -196,7 +226,7 @@ static struct sol_gpio *
 setup_button(const struct light_context *ctx)
 {
     struct sol_gpio_config conf = {
-        SOL_SET_API_VERSION(.api_version = SOL_GPIO_CONFIG_API_VERSION,)
+        SOL_SET_API_VERSION(.api_version = SOL_GPIO_CONFIG_API_VERSION, )
         .dir = SOL_GPIO_DIR_IN,
         .in = {
             .trigger_mode = SOL_GPIO_EDGE_FALLING,
@@ -212,7 +242,7 @@ setup_server(void)
 {
     struct light_context *lc;
     static struct sol_coap_resource light = {
-        SOL_SET_API_VERSION(.api_version = SOL_COAP_RESOURCE_API_VERSION,)
+        SOL_SET_API_VERSION(.api_version = SOL_COAP_RESOURCE_API_VERSION, )
         .get = light_method_get,
         .put = light_method_put,
         .flags = SOL_COAP_FLAGS_WELL_KNOWN,
@@ -222,6 +252,9 @@ setup_server(void)
             SOL_STR_SLICE_EMPTY
         }
     };
+    struct sol_network_link_addr servaddr =
+    { .family = SOL_NETWORK_FAMILY_INET6,
+      .port = DEFAULT_UDP_PORT };
 
     lc = calloc(1, sizeof(*lc));
     if (!lc) {
@@ -238,7 +271,7 @@ setup_server(void)
 
     lc->btn = setup_button(lc);
 
-    lc->server = sol_coap_server_new(DEFAULT_UDP_PORT);
+    lc->server = sol_coap_server_new(&servaddr);
     if (!lc->server) {
         SOL_WRN("lc->server failed");
         sol_gpio_close(lc->led);
@@ -270,17 +303,18 @@ show_interfaces(void)
         uint16_t i;
 
         printf("Found %d links\n", links->len);
-        SOL_VECTOR_FOREACH_IDX(links, l, i) {
+        SOL_VECTOR_FOREACH_IDX (links, l, i) {
             uint16_t j;
             const struct sol_network_link_addr *addr;
 
             printf("Link #%d\n", i);
-            SOL_VECTOR_FOREACH_IDX(&l->addrs, addr, j) {
-                char buf[100];
+            SOL_VECTOR_FOREACH_IDX (&l->addrs, addr, j) {
+                SOL_BUFFER_DECLARE_STATIC(buf, SOL_INET_ADDR_STRLEN);
                 const char *ret;
-                ret = sol_network_addr_to_str(addr, buf, sizeof(buf));
+                ret = sol_network_link_addr_to_str(addr, &buf);
                 if (ret)
-                    printf("\tAddr #%d: %s\n", j, ret);
+                    printf("\tAddr #%d: %.*s\n", j,
+                        SOL_STR_SLICE_PRINT(sol_buffer_get_slice(&buf)));
             }
         }
     } else {

@@ -1,0 +1,13 @@
+#Client -- change the other side's device_id to your case
+
+button(Button)
+led(LED)
+
+light(oic/client-light:device_id="c2fa840a43324d512020203241100b0b")
+
+_(constant/boolean:value=false) OUT -> ENABLED timer(timer:interval=400)
+timer OUT -> IN toggle(boolean/toggle) OUT -> STATE light
+
+button  OUT -> IN filter(boolean/filter) TRUE -> ENABLED timer
+timer OUT -> IN _(converter/empty-to-boolean:output_value=false) OUT -> ENABLED timer
+light STATE -> IN led

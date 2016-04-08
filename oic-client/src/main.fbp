@@ -3,7 +3,8 @@
 button(Button)
 led(LED)
 
-light(oic/client-light:device_id="c2fa840a43324d512020203241100b0b")
+# server's ID hardcoded
+light(oic/client-light:device_id="4d77755382fb459abdd2181de3316fff")
 
 _(constant/boolean:value=false) OUT -> ENABLED timer(timer:interval=400)
 timer OUT -> IN toggle(boolean/toggle) OUT -> STATE light

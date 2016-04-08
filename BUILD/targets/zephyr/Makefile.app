@@ -25,6 +25,8 @@ SOLETTA_LDFLAGS = $(LDFLAGS) $(LIB_INCLUDE_DIR)
 # To keep the compiler from whining about .../sysgen not being there
 SOLETTA_CFLAGS += -Wno-missing-include-dirs
 
+SOLETTA_CFLAGS += $(MACHINE_IDENTIFICATION)
+
 export SOLETTA_CFLAGS SOLETTA_LDFLAGS
 
 ZEPHYRINCLUDE += -I$(SOLETTA_INCLUDE_PATH) $(LOGGING_LEVEL)

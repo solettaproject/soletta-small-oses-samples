@@ -22,6 +22,11 @@ ifneq (,$(LOG_LEVEL))
 export LOGGING_LEVEL = -DSOL_LOG_LEVEL=\"$(LOG_LEVEL)\"
 endif
 
+ifneq (,$(MACHINE_ID))
+export MACHINE_IDENTIFICATION = -DSOL_MACHINE_ID=\\\"$(MACHINE_ID)\\\"
+$(info setting machine id to $(MACHINE_IDENTIFICATION))
+endif
+
 APP_SOURCES := $(addprefix $(WORKING_TOPDIR)/src/, $(C_SOURCES) $(FBP_SOURCES))
 
 TARGET_CONFIG := $(realpath $(WORKING_TOPDIR)/config.$(TARGET))

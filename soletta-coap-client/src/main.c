@@ -239,11 +239,13 @@ static bool
 setup_server(void)
 {
     struct remote_light_context *ctx;
+    struct sol_network_link_addr servaddr = { .family = SOL_NETWORK_FAMILY_INET6,
+                                              .port = 0 };
 
     ctx = calloc(1, sizeof(*ctx));
     SOL_NULL_CHECK(ctx, false);
 
-    ctx->server = sol_coap_server_new(0);
+    ctx->server = sol_coap_server_new(&servaddr);
     SOL_NULL_CHECK_GOTO(ctx->server, server_failed);
 
     ctx->button = setup_button(ctx);

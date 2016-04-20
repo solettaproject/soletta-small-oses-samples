@@ -1,2 +1,3 @@
 MAIN_STACK_SIZE := 3072
 C_SOURCES := main.c
+LOG_LEVEL := 5

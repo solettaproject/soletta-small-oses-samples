@@ -237,9 +237,11 @@ setup_button(const struct light_context *ctx)
 
     return sol_gpio_open(GPIO_BTN, &conf);
 }
+
 static bool
 setup_server(void)
 {
+    int r;
     struct light_context *lc;
     static struct sol_coap_resource light = {
         SOL_SET_API_VERSION(.api_version = SOL_COAP_RESOURCE_API_VERSION, )
@@ -279,8 +281,9 @@ setup_server(void)
         return false;
     }
 
-    if (!sol_coap_server_register_resource(lc->server, &light, lc)) {
-        SOL_WRN("register resource failed");
+    r = sol_coap_server_register_resource(lc->server, &light, lc);
+    if (r < 0) {
+        SOL_WRN("register resource failed: %d", r);
         sol_coap_server_unref(lc->server);
         sol_gpio_close(lc->led);
         free(lc);

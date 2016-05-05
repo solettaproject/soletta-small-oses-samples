@@ -1,0 +1,9 @@
+# Configures the size of the stack for the main thread, in bytes (optional)
+MAIN_STACK_SIZE = 4096
+
+## Application sources to be found under the src/ directory
+# Plain C sources
+C_SOURCES := main.c
+
+# FBP sources, will be converted to C by the build system
+FBP_SOURCES :=

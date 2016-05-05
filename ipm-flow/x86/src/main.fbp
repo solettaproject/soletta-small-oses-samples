@@ -1,0 +1,90 @@
+# This file is part of the Soletta Project
+#
+# Copyright (C) 2015 Intel Corporation. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Send and receive string
+string_generator(test/string-generator:sequence="Hello world x86|Second string x86",separator="|",interval=4000)
+ipm_string_writer(ipm/string-writer:id=1)
+string_generator OUT -> IN ipm_string_writer
+
+ipm_string_reader(ipm/string-reader:id=1)
+ipm_string_reader OUT -> IN string_reader_x86(console:prefix="x86 got: ")
+
+# Send and receive int
+int_generator(test/int-generator:sequence="-142 142",interval=4000)
+ipm_int_writer(ipm/int-writer:id=2)
+int_generator OUT -> IN ipm_int_writer
+
+ipm_int_reader(ipm/int-reader:id=2)
+ipm_int_reader OUT -> IN int_reader_x86(console:prefix="x86 got: ")
+
+# Send and receive float
+float_generator(test/float-generator:sequence="-142.5 142.5",interval=4000)
+ipm_float_writer(ipm/float-writer:id=3)
+float_generator OUT -> IN ipm_float_writer
+
+ipm_float_reader(ipm/float-reader:id=3)
+ipm_float_reader OUT -> IN float_reader_x86(console:prefix="x86 got: ")
+
+# Send and receive byte
+byte_generator(test/byte-generator:sequence="110 120",interval=4000)
+ipm_byte_writer(ipm/byte-writer:id=4)
+byte_generator OUT -> IN ipm_byte_writer
+
+ipm_byte_reader(ipm/byte-reader:id=4)
+ipm_byte_reader OUT -> IN byte_reader_x86(console:prefix="x86 got: ")
+
+# Send and receive boolean
+boolean_generator(test/boolean-generator:sequence="TF",interval=4000)
+ipm_boolean_writer(ipm/boolean-writer:id=5)
+boolean_generator OUT -> IN ipm_boolean_writer
+
+ipm_boolean_reader(ipm/boolean-reader:id=5)
+ipm_boolean_reader OUT -> IN boolean_reader_x86(console:prefix="x86 got: ")
+
+# From now on, only one packet is sent to each packet type
+# Send and receive RGB
+timer_rgb(timer:interval=4000)
+timer_rgb OUT -> IN rgb_converter(converter/empty-to-rgb:output_value=150|200|250)
+timer_rgb OUT -> IN _(converter/empty-to-boolean:output_value=false) OUT -> ENABLED timer_rgb
+
+ipm_rgb_writer(ipm/rgb-writer:id=6)
+rgb_converter OUT -> IN ipm_rgb_writer
+
+ipm_rgb_reader(ipm/rgb-reader:id=6)
+ipm_rgb_reader OUT -> IN rgb_reader_x86(console:prefix="x86 got: ")
+
+# Send and receive direction_vector
+timer_direction_vector(timer:interval=4000)
+direction_vector_converter(converter/rgb-to-direction-vector)
+timer_direction_vector OUT -> IN direction_vector_converter_rgb(converter/empty-to-rgb:output_value=125|150|200)
+direction_vector_converter_rgb OUT -> IN direction_vector_converter
+timer_direction_vector OUT -> IN _(converter/empty-to-boolean:output_value=false) OUT -> ENABLED timer_direction_vector
+
+ipm_direction_vector_writer(ipm/direction-vector-writer:id=7)
+direction_vector_converter OUT -> IN ipm_direction_vector_writer
+
+ipm_direction_vector_reader(ipm/direction-vector-reader:id=7)
+ipm_direction_vector_reader OUT -> IN direction_vector_reader_x86(console:prefix="x86 got: ")
+
+# Send and receive empty
+ipm_empty_writer(ipm/empty-writer:id=8)
+timer_empty(timer:interval=4000)
+timer_empty OUT -> IN _(converter/empty-to-boolean:output_value=false) OUT -> ENABLED timer_empty
+
+timer_empty OUT -> IN ipm_empty_writer
+
+ipm_empty_reader(ipm/empty-reader:id=8)
+ipm_empty_reader OUT -> IN empty_reader_x86(console:prefix="x86 got: ")

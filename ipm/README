@@ -1,0 +1,22 @@
+This samples shows a simple communication between two cores
+on Zephyr. It can be tested on an Arduino 101, for instance.
+This board have two cores: one ARC and one Quark (x86).
+Directories `x86/` and `arc/` have program that runs on x86 and ARC
+core, respectively.
+
+Building and flashing:
+
+On x86 dir:
+
+    make -C ../../BUILD/ zephyr BOARD=arduino_101 KERNEL_TYPE=nano ARCH=x86 flash
+
+Or, if building for microkernel:
+
+    make -C ../../BUILD/ zephyr BOARD=arduino_101 ARCH=x86 flash
+
+On arc dir:
+
+    make -C ../../BUILD/ zephyr BOARD=arduino_101_sss KERNEL_TYPE=nano ARCH=arc flash
+
+Then, you should see on Arduino 101 serial, for instance, both cores
+exchanging string messages indefinetely.

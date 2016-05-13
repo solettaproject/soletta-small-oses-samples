@@ -1,0 +1,44 @@
+This samples shows a simple communication between two cores
+on Zephyr using Soletta flow. It can be tested on an Arduino 101, for
+instance. This board have two cores: one ARC and one Quark (x86).
+Directories `x86/` and `arc/` have program that runs on x86 and ARC
+core, respectively. This sample also uses an ADC reader: it will read
+input from a sensor on ARC, calculate a five elements mean and send
+this value to x86 core.
+
+Wiring:
+
+This sample will read values from an ADC sensor that is connected
+to pin A4 on an Arduino 101. Do not forget to connect sensor VCC and GND
+to respective Arduino 101 pins. For instance, if using a Grove Kit
+Rotary sensor:
+
+  - Connect Arduino 101 GND to Rotary sensor GND
+  - Connect Arduino 101 3.3V to Rotary sensor VCC
+  - Connect Arduino 101 A4 to Rotary sensor SIG
+
+Building and flashing:
+
+Make sure that `sol-fbp-generator` is on PATH and `libsoletta.so` is on
+LD_LIBRARY_PATH.
+
+On x86 dir:
+
+    make -C ../../BUILD/ zephyr BOARD=arduino_101 KERNEL_TYPE=nano ARCH=x86 flash
+
+Or, if building for microkernel:
+
+    make -C ../../BUILD/ zephyr BOARD=arduino_101 ARCH=x86 flash
+
+On arc dir:
+
+    make -C ../../BUILD/ zephyr BOARD=arduino_101_sss KERNEL_TYPE=nano ARCH=arc flash
+
+Then, you should see on Arduino 101 serial an output like
+`ipm_console0: 'ARC read 1108 (integer range)'` for each ARC read.
+After 5 reads, you should also see something like
+`x86 got mean: 1108 (integer range)`
+with mean that ARC computed from last 5 read values and sent to x86.
+Note that `aio/reader` node type only outputs reads different from last
+one it got, so, while testing, ensure that values change. If using Grove
+Kit Rotary sensor, you can always turn it's dial to get new readings.

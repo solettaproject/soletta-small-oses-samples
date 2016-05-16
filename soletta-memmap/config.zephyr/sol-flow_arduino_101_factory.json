@@ -1,0 +1,45 @@
+{
+ "$schema": "http://solettaproject.github.io/soletta/schemas/config.schema",
+ "nodetypes": [
+  {
+   "name": "Button",
+   "options": {
+    "pin": "17",
+    "raw": true,
+    "active_low": false,
+    "edge_falling": true,
+    "edge_rising": false
+   },
+   "type": "gpio/reader"
+  }
+ ],
+ "maps": [
+  {
+   "version": 1,
+   "path": "W25QXXDV,4096,256,0",
+   "timeout": 25,
+   "entries": [
+    {
+     "name": "_version",
+     "offset": 2,
+     "size": 1
+    },
+    {
+     "name": "bool_test",
+     "offset": 3,
+     "size": 4,
+     "bit_size": 1,
+     "bit_offset": 2
+    },
+    {
+     "name": "int_test",
+     "size": 16
+    },
+    {
+     "name": "str_test",
+     "size": 300
+    }
+   ]
+  }
+ ]
+}

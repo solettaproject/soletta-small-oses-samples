@@ -1,0 +1,27 @@
+# This file is part of the Soletta Project
+#
+# Copyright (C) 2015 Intel Corporation. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+btn(Button)
+int_persist(persistence/int:storage="memmap", name="int_test")
+int_persist OUT -> SET acc(int/accumulator:send_initial_packet=false)
+btn OUT -> INC acc OUT -> IN int_persist OUT -> IN _(console:prefix="Integer: ")
+
+bool_persist(persistence/boolean:storage="memmap", name="bool_test")
+bool_persist OUT -> SET toggle(boolean/toggle) OUT -> IN bool_persist
+bool_persist OUT -> IN _(console:prefix="Boolean: ")
+btn OUT -> IN toggle
+
+_(constant/string:value="Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec elementum placerat massa, tincidunt auctor erat volutpat eget. Cras neque arcu, varius in diam eget, aliquam congue mauris. Suspendisse convallis scelerisque elit, non lobortis.") OUT -> IN str_persist(persistence/string:storage="memmap", name="str_test") OUT -> IN _(console:prefix="String: ")

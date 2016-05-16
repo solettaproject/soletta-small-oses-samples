@@ -1,0 +1,19 @@
+This sample shows a simple flow with memory map usage (Arduino 101's
+internal flash memory). It will persist 3 values:
+
+- an integer
+- a boolean (within a bit-field region)
+- a string
+
+It expects an input GPIO interaction on pin 17 (Arduino shield's D3),
+that will make the integer one unit greater and toggle the boolean
+value.
+
+Building and flashing:
+
+    CFLAGS="-Os" make -C ../BUILD/ zephyr BOARD=arduino_101 KERNEL_TYPE=nano flash
+
+    make -C ../BUILD/ zephyr BOARD=arduino_101 KERNEL_TYPE=nano ARCH=x86 flash
+
+Then you should see on Arduino 101's serial output the states of
+those values, updated after each button interaction.

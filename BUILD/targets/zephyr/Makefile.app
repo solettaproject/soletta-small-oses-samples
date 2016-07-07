@@ -10,9 +10,9 @@ include $(MAKEFILE_TOPDIR)/Makefile.rules
 ifeq (,$(GENERATED_C_SOURCES))
 force_soletta_dep = $(SOLETTA_LIB_PATH)
 else
-force_soletta_dep = $(SOURCE_DIR)$(GENERATED_C_SOURCES)
+force_soletta_dep = $(SOURCE_DIR)/$(GENERATED_C_SOURCES)
 
-$(SOURCE_DIR)$(GENERATED_C_SOURCES): $(SOLETTA_LIB_PATH)
+$(SOURCE_DIR)/$(GENERATED_C_SOURCES): $(SOLETTA_LIB_PATH)
 endif
 
 scripts_basic: $(force_soletta_dep)

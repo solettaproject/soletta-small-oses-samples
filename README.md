@@ -15,7 +15,7 @@ All these configuration files may be include the board name targetted too, for
 example:
  * sol_quark_se_devboard.conf
  * sol-flow_samr21-xpro.json
- * prj_qemux86.conf
+ * prj_qemu_x86.conf
 
 ## Build instructions
 

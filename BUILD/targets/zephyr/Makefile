@@ -1,4 +1,4 @@
-KERNEL_TYPE ?= micro
+KERNEL_TYPE ?= nano
 BOARD ?= qemu_x86
 MDEF_FILE := prj.mdef
 

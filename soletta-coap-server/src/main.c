@@ -58,7 +58,7 @@ light_resource_to_rep(const struct sol_coap_resource *resource,
     SOL_BUFFER_DECLARE_STATIC(buffer, 64);
     int r;
 
-    r = sol_coap_uri_path_to_buf(resource->path, &buffer, 0, NULL);
+    r = sol_coap_path_to_buffer(resource->path, &buffer, 0, NULL);
     SOL_INT_CHECK(r, < 0, r);
 
     r = sol_buffer_append_printf(buf,
@@ -99,20 +99,20 @@ set_light_state(struct light_context *ctx)
 
     sol_gpio_write(ctx->led, ctx->state);
 
-    pkt = sol_coap_packet_notification_new(ctx->server, ctx->resource);
+    pkt = sol_coap_packet_new_notification(ctx->server, ctx->resource);
     if (!pkt) {
         SOL_WRN("Oops! No memory?");
         return;
     }
 
-    sol_coap_header_set_code(pkt, SOL_COAP_RSPCODE_CONTENT);
+    sol_coap_header_set_code(pkt, SOL_COAP_RESPONSE_CODE_CONTENT);
 
     r = sol_coap_packet_get_payload(pkt, &buf, &offset);
     SOL_INT_CHECK_GOTO(r, < 0, err);
     r = light_resource_to_rep(ctx->resource, ctx->state, buf);
     SOL_INT_CHECK_GOTO(r, < 0, err);
 
-    sol_coap_packet_send_notification(ctx->server, ctx->resource, pkt);
+    sol_coap_notify(ctx->server, ctx->resource, pkt);
 
     return;
 
@@ -121,10 +121,11 @@ err:
 }
 
 static int
-light_method_put(struct sol_coap_server *server, const struct sol_coap_resource *resource, struct sol_coap_packet *req,
-    const struct sol_network_link_addr *cliaddr, void *data)
+light_method_put(void *data, struct sol_coap_server *server,
+    const struct sol_coap_resource *resource, struct sol_coap_packet *req,
+    const struct sol_network_link_addr *cliaddr)
 {
-    sol_coap_responsecode_t code = SOL_COAP_RSPCODE_CONTENT;
+    enum sol_coap_response_code code = SOL_COAP_RESPONSE_CODE_CONTENT;
     struct light_context *lc = data;
     struct sol_coap_packet *resp;
     struct sol_buffer *buf;
@@ -138,7 +139,7 @@ light_method_put(struct sol_coap_server *server, const struct sol_coap_resource 
     if (buf->used > offset)
         sub = strstr((char *)sol_buffer_at(buf, offset), "state\":");
     if (!sub) {
-        code = SOL_COAP_RSPCODE_BAD_REQUEST;
+        code = SOL_COAP_RESPONSE_CODE_BAD_REQUEST;
         goto done;
     }
 
@@ -152,15 +153,16 @@ done:
         SOL_WRN("resp failed");
         return -1;
     }
-    sol_coap_header_set_type(resp, SOL_COAP_TYPE_ACK);
+    sol_coap_header_set_type(resp, SOL_COAP_MESSAGE_TYPE_ACK);
     sol_coap_header_set_code(resp, code);
 
     return sol_coap_send_packet(lc->server, resp, cliaddr);
 }
 
 static int
-light_method_get(struct sol_coap_server *s, const struct sol_coap_resource *resource, struct sol_coap_packet *req,
-    const struct sol_network_link_addr *cliaddr, void *data)
+light_method_get(void *data, struct sol_coap_server *s,
+    const struct sol_coap_resource *resource, struct sol_coap_packet *req,
+    const struct sol_network_link_addr *cliaddr)
 {
     struct light_context *lc = data;
     struct sol_coap_packet *resp;
@@ -172,8 +174,8 @@ light_method_get(struct sol_coap_server *s, const struct sol_coap_resource *reso
         SOL_WRN("resp failed");
         return -1;
     }
-    sol_coap_header_set_type(resp, SOL_COAP_TYPE_ACK);
-    sol_coap_header_set_code(resp, SOL_COAP_RSPCODE_CONTENT);
+    sol_coap_header_set_type(resp, SOL_COAP_MESSAGE_TYPE_ACK);
+    sol_coap_header_set_code(resp, SOL_COAP_RESPONSE_CODE_CONTENT);
 
     r = sol_coap_packet_get_payload(resp, &buf, NULL);
     SOL_INT_CHECK_GOTO(r, < 0, err);
@@ -273,7 +275,7 @@ setup_server(void)
 
     lc->btn = setup_button(lc);
 
-    lc->server = sol_coap_server_new(&servaddr);
+    lc->server = sol_coap_server_new(&servaddr, false);
     if (!lc->server) {
         SOL_WRN("lc->server failed");
         sol_gpio_close(lc->led);
@@ -312,7 +314,7 @@ show_interfaces(void)
 
             printf("Link #%d\n", i);
             SOL_VECTOR_FOREACH_IDX (&l->addrs, addr, j) {
-                SOL_BUFFER_DECLARE_STATIC(buf, SOL_INET_ADDR_STRLEN);
+                SOL_BUFFER_DECLARE_STATIC(buf, SOL_NETWORK_INET_ADDR_STR_LEN);
                 const char *ret;
                 ret = sol_network_link_addr_to_str(addr, &buf);
                 if (ret)

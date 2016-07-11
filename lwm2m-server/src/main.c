@@ -36,7 +36,7 @@ get_location_object_status(const struct sol_lwm2m_client_info *cinfo)
 
         r = sol_lwm2m_client_object_get_id(object, &id);
         if (r < 0) {
-            SOL_WRN(stderr, "Could not fetch the object id from %p", object);
+            SOL_WRN("Could not fetch the object id from %p", object);
             return LOCATION_OBJECT_NOT_FOUND;
         }
 
@@ -58,7 +58,7 @@ location_changed_cb(void *data,
     struct sol_lwm2m_server *server,
     struct sol_lwm2m_client_info *cinfo,
     const char *path,
-    sol_coap_responsecode_t response_code,
+    enum sol_coap_response_code response_code,
     enum sol_lwm2m_content_type content_type,
     struct sol_str_slice content)
 {
@@ -68,15 +68,15 @@ location_changed_cb(void *data,
     uint16_t i;
     struct sol_lwm2m_tlv *tlv;
 
-    if (response_code != SOL_COAP_RSPCODE_CHANGED &&
-        response_code != SOL_COAP_RSPCODE_CONTENT) {
-        SOL_WRN(stderr, "Could not get the location object value from"
+    if (response_code != SOL_COAP_RESPONSE_CODE_CHANGED &&
+        response_code != SOL_COAP_RESPONSE_CODE_CONTENT) {
+        SOL_WRN("Could not get the location object value from"
             " client %s", name);
         return;
     }
 
     if (content_type != SOL_LWM2M_CONTENT_TYPE_TLV) {
-        SOL_WRN(stderr, "The location object content from client %s is not"
+        SOL_WRN("The location object content from client %s is not"
             " in TLV format. Received format: %d", name, content_type);
         return;
     }
@@ -84,14 +84,13 @@ location_changed_cb(void *data,
     r = sol_lwm2m_parse_tlv(content, &tlvs);
 
     if (r < 0) {
-        SOL_WRN(stderr, "Could not parse the tlv from client: %s", name);
+        SOL_WRN("Could not parse the tlv from client: %s", name);
         return;
     }
 
     SOL_VECTOR_FOREACH_IDX (&tlvs, tlv, i) {
         const char *prop;
-        uint8_t *bytes;
-        uint16_t len;
+        SOL_BUFFER_DECLARE_STATIC(buf, 32);
 
         if (tlv->id == LATITUDE_ID)
             prop = "latitude";
@@ -100,17 +99,18 @@ location_changed_cb(void *data,
         else
             continue;
 
-        r = sol_lwm2m_tlv_get_bytes(tlv, &bytes, &len);
+        r = sol_lwm2m_tlv_get_bytes(tlv, &buf);
         if (r < 0) {
-            SOL_WRN(stderr, "Could not the %s value from client %s",
+            SOL_WRN("Could not the %s value from client %s",
                 prop, name);
             break;
         }
 
-        SOL_DBG("Client %s %s is %.*s", name, prop, (int)len, bytes);
-    }
+        SOL_DBG("Client %s %s is %.*s", name, prop, (int)buf.used,
+                (char *)buf.data);
 
-    sol_lwm2m_tlv_array_clear(&tlvs);
+        sol_buffer_fini(&buf);
+    }
 }
 
 static void
@@ -123,7 +123,7 @@ observe_location(struct sol_lwm2m_server *server,
         location_changed_cb, NULL);
 
     if (r < 0)
-        SOL_WRN(stderr, "Could not send an observe request to the location"
+        SOL_WRN("Could not send an observe request to the location"
             " object");
     else
         SOL_DBG("Observe request to the location object sent");
@@ -133,12 +133,12 @@ static void
 create_cb(void *data,
     struct sol_lwm2m_server *server,
     struct sol_lwm2m_client_info *cinfo, const char *path,
-    sol_coap_responsecode_t response_code)
+    enum sol_coap_response_code response_code)
 {
     const char *name = sol_lwm2m_client_info_get_name(cinfo);
 
-    if (response_code != SOL_COAP_RSPCODE_CREATED) {
-        SOL_WRN(stderr, "The client %s could not create the location object.",
+    if (response_code != SOL_COAP_RESPONSE_CODE_CREATED) {
+        SOL_WRN("The client %s could not create the location object.",
             name);
         return;
     }
@@ -166,7 +166,7 @@ create_location_obj(struct sol_lwm2m_server *server,
         sol_str_slice_from_str("48.858093"));
 
     if (r < 0) {
-        SOL_WRN(stderr, "Could not init the latitude resource");
+        SOL_WRN("Could not init the latitude resource");
         return;
     }
 
@@ -175,7 +175,7 @@ create_location_obj(struct sol_lwm2m_server *server,
         sol_str_slice_from_str("2.294694"));
 
     if (r < 0) {
-        SOL_WRN(stderr, "Could not init the longitude resource");
+        SOL_WRN("Could not init the longitude resource");
         return;
     }
 
@@ -184,18 +184,18 @@ create_location_obj(struct sol_lwm2m_server *server,
         (int64_t)time(NULL));
 
     if (r < 0) {
-        SOL_WRN(stderr, "Could not init the longitude resource");
+        SOL_WRN("Could not init the longitude resource");
         return;
     }
 
-    r = sol_lwm2m_server_management_create(server, cinfo, "/6", res,
-        SOL_UTIL_ARRAY_SIZE(res), create_cb, NULL);
+    r = sol_lwm2m_server_create_object_instance(server, cinfo, "/6", res,
+        sol_util_array_size(res), create_cb, NULL);
 
-    for (i = 0; i < SOL_UTIL_ARRAY_SIZE(res); i++)
+    for (i = 0; i < sol_util_array_size(res); i++)
         sol_lwm2m_resource_clear(&res[i]);
 
     if (r < 0)
-        SOL_WRN(stderr, "Could not send a request to create a"
+        SOL_WRN("Could not send a request to create a"
             " location object");
     else
         SOL_DBG("Creation request sent");
@@ -227,7 +227,7 @@ registration_cb(void *data,
     status = get_location_object_status(cinfo);
 
     if (status == LOCATION_OBJECT_NOT_FOUND) {
-        SOL_WRN(stderr,
+        SOL_WRN(
             "The client %s does not implement the location object!",
             name);
     } else if (status == LOCATION_OBJECT_WITH_NO_INSTANCES) {
@@ -252,14 +252,14 @@ setup_server(void)
 
     server = sol_lwm2m_server_new(port);
     if (!server) {
-        SOL_WRN(stderr, "Could not create the LWM2M server");
+        SOL_WRN("Could not create the LWM2M server");
         goto exit;
     }
 
     r = sol_lwm2m_server_add_registration_monitor(server, registration_cb,
         NULL);
     if (r < 0) {
-        SOL_WRN(stderr, "Could not add a registration monitor");
+        SOL_WRN("Could not add a registration monitor");
         goto exit_del;
     }
 
@@ -292,7 +292,7 @@ show_interfaces(void)
 
             SOL_DBG("Link #%d", i);
             SOL_VECTOR_FOREACH_IDX (&l->addrs, addr, j) {
-                SOL_BUFFER_DECLARE_STATIC(buf, SOL_INET_ADDR_STRLEN);
+                SOL_BUFFER_DECLARE_STATIC(buf, SOL_NETWORK_INET_ADDR_STR_LEN);
                 const char *ret;
 
                 ret = sol_network_link_addr_to_str(addr, &buf);

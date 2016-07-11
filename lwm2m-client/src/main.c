@@ -84,7 +84,7 @@ change_location(void *data)
     SOL_DBG("New latitude: %s - New longitude: %s", instance_ctx->latitude,
         instance_ctx->longitude);
 
-    r = sol_lwm2m_notify_observers(instance_ctx->client, paths);
+    r = sol_lwm2m_client_notify(instance_ctx->client, paths);
 
     if (r < 0) {
         SOL_WRN("Could not notify the observers");
@@ -97,12 +97,10 @@ change_location(void *data)
 static int
 create_location_obj(void *user_data, struct sol_lwm2m_client *client,
     uint16_t instance_id, void **instance_data,
-    enum sol_lwm2m_content_type content_type,
-    const struct sol_str_slice content)
+    struct sol_lwm2m_payload payload)
 {
     struct location_obj_instance_ctx *instance_ctx;
     bool *has_location_instance = user_data;
-    struct sol_vector tlvs;
     int r;
     uint16_t i;
     struct sol_lwm2m_tlv *tlv;
@@ -113,7 +111,7 @@ create_location_obj(void *user_data, struct sol_lwm2m_client *client,
         return -EINVAL;
     }
 
-    if (content_type != SOL_LWM2M_CONTENT_TYPE_TLV) {
+    if (payload.type != SOL_LWM2M_CONTENT_TYPE_TLV) {
         SOL_WRN("Content type is not in TLV format");
         return -EINVAL;
     }
@@ -132,61 +130,50 @@ create_location_obj(void *user_data, struct sol_lwm2m_client *client,
         goto err_free_instance;
     }
 
-    r = sol_lwm2m_parse_tlv(content, &tlvs);
-    if (r < 0) {
-        SOL_WRN("Could not parse the TLV content");
+    if (payload.payload.tlv_content.len != 3) {
+        r = -EINVAL;
+        SOL_WRN("Missing mandatory fields.");
         goto err_free_timeout;
     }
 
-    if (tlvs.len != 3) {
-        r = -EINVAL;
-        SOL_WRN("Missing mandatory fields.");
-        goto err_free_tlvs;
-    }
-
-    SOL_VECTOR_FOREACH_IDX (&tlvs, tlv, i) {
-        uint8_t *bytes;
-        uint16_t bytes_len;
+    SOL_VECTOR_FOREACH_IDX (&payload.payload.tlv_content, tlv, i) {
+        SOL_BUFFER_DECLARE_STATIC(buf, 32);
         char **prop = NULL;
 
-        bytes_len = 0;
-
         if (tlv->id == LOCATION_OBJ_LATITUDE_RES_ID) {
-            r = sol_lwm2m_tlv_get_bytes(tlv, &bytes, &bytes_len);
+            r = sol_lwm2m_tlv_get_bytes(tlv, &buf);
             prop = &instance_ctx->latitude;
         } else if (tlv->id == LOCATION_OBJ_LONGITUDE_RES_ID) {
-            r = sol_lwm2m_tlv_get_bytes(tlv, &bytes, &bytes_len);
+            r = sol_lwm2m_tlv_get_bytes(tlv, &buf);
             prop = &instance_ctx->longitude;
         } else
-            r = sol_lwm2m_tlv_to_int(tlv, &instance_ctx->timestamp);
+            r = sol_lwm2m_tlv_get_int(tlv, &instance_ctx->timestamp);
 
         if (r < 0) {
             SOL_WRN("Could not get the tlv value for resource %"
                 PRIu16, tlv->id);
-            goto err_free_tlvs;
+            goto err_free_timeout;
         }
 
-        if (bytes_len) {
-            *prop = strndup((const char *)bytes, bytes_len);
+        if (buf.used) {
+            *prop = strndup((const char *)buf.data, buf.used);
             if (!*prop) {
                 r = -ENOMEM;
                 SOL_WRN("Could not copy the longitude/latitude"
                     " property");
-                goto err_free_tlvs;
+                goto err_free_timeout;
             }
         }
+        sol_buffer_fini(&buf);
     }
 
     instance_ctx->client = client;
     *instance_data = instance_ctx;
     *has_location_instance = true;
-    sol_lwm2m_tlv_array_clear(&tlvs);
     SOL_DBG("Location object created");
 
     return 0;
 
-err_free_tlvs:
-    sol_lwm2m_tlv_array_clear(&tlvs);
 err_free_timeout:
     sol_timeout_del(instance_ctx->timeout);
     free(instance_ctx->longitude);
@@ -246,7 +233,7 @@ read_security_server_obj(void *instance_data, void *user_data,
         break;
     case SECURITY_SERVER_IS_BOOTSTRAP_RES_ID:
         SOL_LWM2M_RESOURCE_INIT(r, res, 1, 1,
-            SOL_LWM2M_RESOURCE_DATA_TYPE_BOOLEAN, false);
+            SOL_LWM2M_RESOURCE_DATA_TYPE_BOOL, false);
         break;
     case SECURITY_SERVER_SERVER_ID_RES_ID:
         SOL_LWM2M_RESOURCE_INIT(r, res, 10, 1,
@@ -304,7 +291,7 @@ execute_server_obj(void *instance_data, void *user_data,
     if (res_id != SERVER_OBJ_REGISTRATION_UPDATE_RES_ID)
         return -EINVAL;
 
-    return sol_lwm2m_send_update(client);
+    return sol_lwm2m_client_send_update(client);
 }
 
 static int
@@ -367,13 +354,13 @@ setup_client(void)
         goto exit;
     }
 
-    r = sol_lwm2m_add_object_instance(client, &server_object, NULL);
+    r = sol_lwm2m_client_add_object_instance(client, &server_object, NULL);
     if (r < 0) {
         SOL_WRN("Could not add a server object instance");
         goto exit_del;
     }
 
-    r = sol_lwm2m_add_object_instance(client, &security_object, NULL);
+    r = sol_lwm2m_client_add_object_instance(client, &security_object, NULL);
 
     if (r < 0) {
         SOL_WRN("Could not add a security object instance");
@@ -408,7 +395,7 @@ show_interfaces(void)
 
             SOL_DBG("Link #%d", i);
             SOL_VECTOR_FOREACH_IDX (&l->addrs, addr, j) {
-                SOL_BUFFER_DECLARE_STATIC(buf, SOL_INET_ADDR_STRLEN);
+                SOL_BUFFER_DECLARE_STATIC(buf, SOL_NETWORK_INET_ADDR_STR_LEN);
                 const char *ret;
 
                 ret = sol_network_link_addr_to_str(addr, &buf);

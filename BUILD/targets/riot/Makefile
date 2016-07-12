@@ -1,7 +1,7 @@
 APPLICATION ?= $(notdir $(WORKING_TOPDIR))
 BOARD ?= native
 
-USEMODULE += gnrc_netif_default
+USEMODULE += gnrc_netdev_default
 USEMODULE += auto_init_gnrc_netif
 USEMODULE += gnrc_ipv6_default
 USEMODULE += gnrc_udp

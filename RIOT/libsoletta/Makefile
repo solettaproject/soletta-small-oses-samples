@@ -5,7 +5,8 @@ PKG_DIR=$(CURDIR)/$(PKG_NAME)
 
 export CFLAGS += $(INCLUDES)
 export LDFLAGS += $(LINKFLAGS)
-export TOOLCHAIN_PREFIX = $(PREFIX)
+export TARGETCC = $(CC)
+export TARGETAR = $(AR)
 
 ifneq (,$(SOLETTA_CONF))
 MERGE_APP_CONF = merge_app_conf
@@ -13,6 +14,8 @@ endif
 
 export PKG_CONFIG_LIBDIR=
 unexport BINDIR
+unexport PREFIX
+unexport CC
 
 .PHONY: all clean
 

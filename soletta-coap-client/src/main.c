@@ -53,7 +53,8 @@ remote_light_toggle(struct remote_light_context *ctx)
     size_t offset;
     int r;
 
-    req = sol_coap_packet_request_new(SOL_COAP_METHOD_PUT, SOL_COAP_TYPE_NONCON);
+    req = sol_coap_packet_new_request(SOL_COAP_METHOD_PUT,
+        SOL_COAP_MESSAGE_TYPE_NON_CON);
     if (!req) {
         SOL_WRN("Oops! No memory?");
         return;
@@ -149,7 +150,7 @@ get_state(struct sol_coap_packet *pkt)
 }
 
 static bool
-notification_reply_cb(struct sol_coap_server *s, struct sol_coap_packet *req, const struct sol_network_link_addr *cliaddr, void *data)
+notification_reply_cb(void *data, struct sol_coap_server *s, struct sol_coap_packet *req, const struct sol_network_link_addr *cliaddr)
 {
     struct remote_light_context *ctx = data;
 
@@ -166,7 +167,8 @@ observe(struct remote_light_context *ctx)
     uint8_t observe = 0;
     uint8_t token[] = { 0x36, 0x36, 0x36, 0x21 };
 
-    req = sol_coap_packet_request_new(SOL_COAP_METHOD_GET, SOL_COAP_TYPE_CON);
+    req = sol_coap_packet_new_request(SOL_COAP_METHOD_GET,
+        SOL_COAP_MESSAGE_TYPE_CON);
     if (!req) {
         SOL_WRN("Looks like we have no space");
         return;
@@ -179,15 +181,16 @@ observe(struct remote_light_context *ctx)
     sol_coap_add_option(req, SOL_COAP_OPTION_URI_PATH, "a", sizeof("a") - 1);
     sol_coap_add_option(req, SOL_COAP_OPTION_URI_PATH, "light", sizeof("light") - 1);
 
-    sol_coap_send_packet_with_reply(ctx->server, req, &ctx->addr, notification_reply_cb, ctx);
+    sol_coap_send_packet_with_reply(ctx->server, req, &ctx->addr,
+        notification_reply_cb, ctx);
 }
 
 static bool
-discover_reply_cb(struct sol_coap_server *s, struct sol_coap_packet *req, const struct sol_network_link_addr *cliaddr, void *data)
+discover_reply_cb(void *data, struct sol_coap_server *s, struct sol_coap_packet *req, const struct sol_network_link_addr *cliaddr)
 {
     struct remote_light_context *ctx = data;
 
-    SOL_BUFFER_DECLARE_STATIC(buf, SOL_INET_ADDR_STRLEN);
+    SOL_BUFFER_DECLARE_STATIC(buf, SOL_NETWORK_INET_ADDR_STR_LEN);
 
     sol_network_link_addr_to_str(cliaddr, &buf);
     printf("Found resource in: %s\n", (char *)buf.data);
@@ -217,7 +220,8 @@ discover_resource(struct remote_light_context *ctx)
     struct sol_coap_packet *req;
     struct sol_network_link_addr cliaddr = { };
 
-    req = sol_coap_packet_request_new(SOL_COAP_METHOD_GET, SOL_COAP_TYPE_CON);
+    req = sol_coap_packet_new_request(SOL_COAP_METHOD_GET,
+        SOL_COAP_MESSAGE_TYPE_CON);
     if (!req) {
         SOL_WRN("Looks like we have no space");
         return false;
@@ -230,7 +234,8 @@ discover_resource(struct remote_light_context *ctx)
     sol_network_link_addr_from_str(&cliaddr, "ff02::fd");
     cliaddr.port = DEFAULT_UDP_PORT;
 
-    sol_coap_send_packet_with_reply(ctx->server, req, &cliaddr, discover_reply_cb, ctx);
+    sol_coap_send_packet_with_reply(ctx->server, req, &cliaddr,
+        discover_reply_cb, ctx);
 
     return true;
 }
@@ -245,7 +250,7 @@ setup_server(void)
     ctx = calloc(1, sizeof(*ctx));
     SOL_NULL_CHECK(ctx, false);
 
-    ctx->server = sol_coap_server_new(&servaddr);
+    ctx->server = sol_coap_server_new(&servaddr, false);
     SOL_NULL_CHECK_GOTO(ctx->server, server_failed);
 
     ctx->button = setup_button(ctx);
@@ -282,7 +287,7 @@ show_interfaces(void)
 
             printf("Link #%d\n", i);
             SOL_VECTOR_FOREACH_IDX (&l->addrs, addr, j) {
-                SOL_BUFFER_DECLARE_STATIC(buf, SOL_INET_ADDR_STRLEN);
+                SOL_BUFFER_DECLARE_STATIC(buf, SOL_NETWORK_INET_ADDR_STR_LEN);
                 const char *ret;
                 ret = sol_network_link_addr_to_str(addr, &buf);
                 if (ret)

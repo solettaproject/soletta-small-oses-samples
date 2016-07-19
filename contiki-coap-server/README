@@ -1,0 +1,8 @@
+This is, essentially, the same as the soletta-coap-server for
+RIOT and Zephyr, except that targeted specifically for Contiki, where
+there is no generic API for GPIO.
+
+To build, two variables need to be exported for make to get them
+
+CONTIKI = path to the Contiki source directory
+SOLETTA_BASE_DIR = path to Soletta's source directory

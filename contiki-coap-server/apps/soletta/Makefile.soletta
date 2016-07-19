@@ -1,0 +1,13 @@
+export TARGETCC = $(CC)
+export TARGETAR = $(AR)
+BOARD_NAME := $(TARGET)
+
+include $(SOLETTA_BASE_DIR)/Makefile.smallos
+
+$(CONTIKI_PROJECT): $(soletta_target)
+
+CFLAGS += -I$(soletta_include_dir)
+LDFLAGS += -L$(soletta_lib_dir)
+
+TARGET_STARTFILES += -Wl,-start-group -lsoletta
+TARGET_LIBFILES += -Wl,-end-group -lm
